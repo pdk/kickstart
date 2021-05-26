@@ -5,9 +5,11 @@ import (
 	"flag"
 	"log"
 	"math"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/pdk/kickstart/migrate"
 	"github.com/pdk/kickstart/server"
 	"github.com/pdk/kickstart/watch"
 
@@ -16,22 +18,29 @@ import (
 
 func main() {
 
+	migrateDB := flag.Bool("migrate", false, "execute the given migration scripts if not executed")
 	watchFiles := flag.String("watch", "", "shutdown when files match given patterns (wrap with script to auto-restart)")
 	databaseName := flag.String("db", "data.db", "name of sqlite3 database file")
 
 	flag.Parse()
 
-	if err := run(*watchFiles, *databaseName); err != nil {
-		log.Fatalf("%v", err)
-	}
-}
-
-func run(watchFiles, databaseName string) error {
-
 	db, err := sql.Open("sqlite3", "./data.db")
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
+
+	if *migrateDB {
+		scripts := os.Args[2:] // grab all the args AFTER the -migrate
+		migrate.Database(db, scripts)
+		return
+	}
+
+	if err := run(db, *watchFiles, *databaseName); err != nil {
+		log.Fatalf("%v", err)
+	}
+}
+
+func run(db *sql.DB, watchFiles, databaseName string) error {
 
 	srv := server.New(db)
 
